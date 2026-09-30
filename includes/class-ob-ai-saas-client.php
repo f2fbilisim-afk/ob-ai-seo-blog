@@ -6,34 +6,40 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class OB_AI_SaaS_Client {
 
-	private static function base_url(): string {
-		$s = OB_AI_Settings::get();
-		$url = trim( (string) ( $s['saas_api_base'] ?? '' ) );
-		if ( '' === $url ) {
-			return '';
+	const PRODUCT = 'seo-blog';
+
+	const DEFAULT_API_BASE = 'https://api.f2fbilisim.com';
+
+	private static function client(): F2F_SaaS_Client {
+		static $client = null;
+		if ( null === $client ) {
+			if ( ! class_exists( 'F2F_SaaS_Client' ) ) {
+				require_once OB_AI_SEO_BLOG_DIR . 'includes/class-f2f-saas-client.php';
+			}
+			$client = new F2F_SaaS_Client( self::PRODUCT, OB_AI_Settings::OPTION_KEY );
 		}
-		return untrailingslashit( $url );
+		return $client;
+	}
+
+	private static function base_url(): string {
+		return self::client()->api_base();
 	}
 
 	private static function license_key(): string {
-		if ( defined( 'OB_AI_LICENSE_KEY' ) && OB_AI_LICENSE_KEY ) {
-			return (string) OB_AI_LICENSE_KEY;
-		}
-		$s = OB_AI_Settings::get();
-		return trim( (string) ( $s['license_key'] ?? '' ) );
+		return self::client()->license_key();
 	}
 
 	private static function request_headers(): array {
-		$headers = array(
+		return array(
 			'Content-Type'  => 'application/json',
 			'X-OB-License'  => self::license_key(),
 			'X-OB-Site-Url' => home_url( '/' ),
+			'X-OB-Product'  => self::PRODUCT,
 		);
-		return $headers;
 	}
 
 	public static function is_configured(): bool {
-		return '' !== self::base_url() && '' !== self::license_key();
+		return self::client()->is_configured();
 	}
 
 	/**

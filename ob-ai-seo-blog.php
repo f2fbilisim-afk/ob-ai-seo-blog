@@ -20,6 +20,7 @@ define( 'OB_AI_SEO_BLOG_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OB_AI_SEO_BLOG_URL', plugin_dir_url( __FILE__ ) );
 
 require_once OB_AI_SEO_BLOG_DIR . 'includes/class-ob-ai-settings.php';
+require_once OB_AI_SEO_BLOG_DIR . 'includes/class-f2f-saas-client.php';
 require_once OB_AI_SEO_BLOG_DIR . 'includes/class-ob-ai-saas-client.php';
 require_once OB_AI_SEO_BLOG_DIR . 'includes/class-ob-ai-openai.php';
 require_once OB_AI_SEO_BLOG_DIR . 'includes/class-ob-ai-rank-math.php';

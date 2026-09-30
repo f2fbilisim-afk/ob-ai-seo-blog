@@ -291,7 +291,7 @@ class OB_AI_Admin {
 						<th scope="row"><label for="license_key"><?php esc_html_e( 'Lisans anahtarı', 'ob-ai-seo-blog' ); ?></label></th>
 						<td>
 							<input type="text" id="license_key" name="<?php echo esc_attr( OB_AI_Settings::OPTION_KEY ); ?>[license_key]" value="<?php echo esc_attr( $s['license_key'] ); ?>" class="regular-text code" autocomplete="off" />
-							<p class="description"><?php esc_html_e( 'Alternatif: define(\'OB_AI_LICENSE_KEY\', \'OBAI-...\');', 'ob-ai-seo-blog' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Önerilen: define(\'F2F_LICENSE_KEY\', \'OBAI-...\'); ve define(\'F2F_SAAS_API_BASE\', \'https://api.f2fbilisim.com\');', 'ob-ai-seo-blog' ); ?></p>
 						</td>
 					</tr>
 					<tr>

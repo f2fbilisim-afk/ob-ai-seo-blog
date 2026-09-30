@@ -14,7 +14,7 @@ class OB_AI_Settings {
 
 	public static function defaults(): array {
 		return array(
-			'saas_api_base'      => '',
+			'saas_api_base'      => 'https://api.f2fbilisim.com',
 			'license_key'        => '',
 			'openai_api_key'     => '',
 			'text_model'         => 'gpt-4o-mini',
