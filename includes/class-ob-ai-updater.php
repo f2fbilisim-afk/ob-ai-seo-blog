@@ -62,7 +62,12 @@ class OB_AI_Updater {
 				)
 			) . '</strong></a>';
 		}
-		$links[] = '<span>' . esc_html__( 'Sürüm', 'ob-ai-seo-blog' ) . ' ' . esc_html( OB_AI_SEO_BLOG_VERSION ) . '</span>';
+		$ver = esc_html__( 'Sürüm', 'ob-ai-seo-blog' ) . ' ' . esc_html( OB_AI_SEO_BLOG_VERSION );
+		if ( defined( 'OB_AI_SEO_BLOG_BUILD' ) ) {
+			$ver .= ' · ' . esc_html( OB_AI_SEO_BLOG_BUILD );
+		}
+		$links[] = '<span>' . $ver . '</span>';
+		$links[] = '<code style="font-size:11px">' . esc_html( OB_AI_SEO_BLOG_FILE ) . '</code>';
 		return $links;
 	}
 

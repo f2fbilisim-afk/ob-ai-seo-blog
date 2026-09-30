@@ -1,17 +1,19 @@
-# Kurulum / güncelleme
+# Kurulum / güncelleme (önemli)
 
-WordPress **Eklentiler** listesindeki sürüm, `ob-ai-seo-blog.php` dosyasındaki **Version** satırından okunur.
+## Hâlâ “OB AI SEO Blog · Sürüm 1.0.0 · Geliştirici OB” görüyorsanız
 
-## Sürüm hâlâ 1.0.0 görünüyorsa
+Bu **eski dosya**dır; üzerine yazma çoğu hostta **yeni kodu devreye almaz**. İki eklenti yan yana kalır, WordPress eskisini çalıştırır.
 
-1. **Eklentiyi etkisizleştir** (silme).
-2. FTP veya Dosya Yöneticisi ile `wp-content/plugins/ob-ai-seo-blog` klasörünü **tamamen silin**.
-3. [Son release zip](https://github.com/f2fbilisim-afk/ob-ai-seo-blog/releases/latest) indirin.
-4. WordPress → **Eklentiler → Yeni ekle → Eklenti yükle** → zip → **Etkinleştir**.
-5. Listede **Sürüm 1.0.4** (veya güncel) ve **Geliştirici: F2F Bilişim** görünmeli.
+### Doğru kurulum (1.1.0)
 
-Aynı sunucuda `ob-ai-seo-blog-1.0.x` gibi **ikinci klasör** varsa silin; yalnızca `ob-ai-seo-blog` kalsın.
+1. **Eklentiler** → **OB AI SEO Blog** (1.0.0) → **Etkisizleştir** → **Sil**
+2. FTP / Dosya Yöneticisi: `wp-content/plugins/` altında şunları arayın ve **silin**:
+   - `ob-ai-seo-blog`
+   - `ob-ai-seo-blog-1`, `ob-ai-seo-blog-1.0.4` vb.
+3. Zip: https://github.com/f2fbilisim-afk/ob-ai-seo-blog/releases/download/v1.1.0/ob-ai-seo-blog-1.1.0.zip
+4. **Eklentiler → Yeni ekle → Eklenti yükle** → zip → **Etkinleştir**
+5. Listede **F2F AI SEO Blog · Sürüm 1.1.0 · F2F Bilişim** görünmeli (eski “OB” satırı gitmeli).
 
-## Otomatik güncelleme
+Hosting **OPcache** açıksa kurulumdan sonra PHP OPcache / LiteSpeed “Flush” yapın.
 
-1.0.2+ sürümlerde **Güncellemeler** veya eklenti satırındaki **Güncelle** kullanılabilir. Manifest sırası: `api.f2fbilisim.com` → GitHub.
+Doğrulama: eklenti satırında küçük yazı ile dosya yolu görünür, örn. `ob-ai-seo-blog/ob-ai-seo-blog.php` ve build `20260930-1.1.0`.

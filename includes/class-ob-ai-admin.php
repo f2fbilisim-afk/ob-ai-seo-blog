@@ -10,6 +10,27 @@ class OB_AI_Admin {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'admin_post_ob_ai_seo_blog_generate', array( __CLASS__, 'handle_generate' ) );
+		add_action( 'admin_notices', array( __CLASS__, 'warn_legacy_duplicate_plugin' ) );
+	}
+
+	public static function warn_legacy_duplicate_plugin(): void {
+		if ( ! current_user_can( 'activate_plugins' ) ) {
+			return;
+		}
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		$duplicates = array();
+		foreach ( get_plugins() as $file => $data ) {
+			if ( false !== stripos( (string) ( $data['Name'] ?? '' ), 'SEO Blog' )
+				&& plugin_basename( OB_AI_SEO_BLOG_FILE ) !== $file ) {
+				$duplicates[] = $data['Name'] . ' (' . ( $data['Version'] ?? '?' ) . ') → ' . $file;
+			}
+		}
+		if ( empty( $duplicates ) ) {
+			return;
+		}
+		echo '<div class="notice notice-error"><p><strong>F2F AI SEO Blog:</strong> ';
+		echo esc_html__( 'Eski eklenti kopyası hâlâ yüklü. Etkisizleştirip silin; yalnızca F2F AI SEO Blog 1.1.0 kalsın:', 'ob-ai-seo-blog' );
+		echo '<br /><code>' . esc_html( implode( ' | ', $duplicates ) ) . '</code></p></div>';
 	}
 
 	public static function menu(): void {
