@@ -3,18 +3,20 @@
  * Plugin Name: OB AI SEO Blog
  * Plugin URI:  https://github.com/f2fbilisim-afk/ob-ai-seo-blog
  * Description: Anahtar kelime listesinden OpenAI ile toplu SEO blog üretir, Rank Math alanlarını doldurur, kapak görseli ekler; anında veya planlı yayınlar.
- * Version:     1.0.1
- * Author:      OB
+ * Version:     1.0.2
+ * Author:      F2F Bilişim
+ * Author URI:  https://www.f2fbilisim.com
  * Text Domain: ob-ai-seo-blog
  * Requires at least: 6.0
  * Requires PHP: 7.4
+ * Update URI:   https://raw.githubusercontent.com/f2fbilisim-afk/ob-ai-seo-blog/main/updates/ob-ai-seo-blog.json
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'OB_AI_SEO_BLOG_VERSION', '1.0.1' );
+define( 'OB_AI_SEO_BLOG_VERSION', '1.0.2' );
 define( 'OB_AI_SEO_BLOG_FILE', __FILE__ );
 define( 'OB_AI_SEO_BLOG_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OB_AI_SEO_BLOG_URL', plugin_dir_url( __FILE__ ) );
@@ -27,6 +29,7 @@ require_once OB_AI_SEO_BLOG_DIR . 'includes/class-ob-ai-rank-math.php';
 require_once OB_AI_SEO_BLOG_DIR . 'includes/class-ob-ai-post-creator.php';
 require_once OB_AI_SEO_BLOG_DIR . 'includes/class-ob-ai-queue.php';
 require_once OB_AI_SEO_BLOG_DIR . 'includes/class-ob-ai-admin.php';
+require_once OB_AI_SEO_BLOG_DIR . 'includes/class-ob-ai-updater.php';
 
 final class OB_AI_SEO_Blog_Plugin {
 
@@ -34,6 +37,9 @@ final class OB_AI_SEO_Blog_Plugin {
 		OB_AI_Settings::init();
 		OB_AI_Queue::init();
 		OB_AI_Admin::init();
+		if ( is_admin() ) {
+			OB_AI_Updater::init();
+		}
 	}
 
 	public static function activate(): void {
