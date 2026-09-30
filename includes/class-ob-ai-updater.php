@@ -22,7 +22,12 @@ class OB_AI_Updater {
 		}
 		$repo   = defined( 'OB_AI_GITHUB_REPO' ) && OB_AI_GITHUB_REPO ? trim( (string) OB_AI_GITHUB_REPO, '/' ) : 'f2fbilisim-afk/ob-ai-seo-blog';
 		$branch = defined( 'OB_AI_GITHUB_BRANCH' ) && OB_AI_GITHUB_BRANCH ? (string) OB_AI_GITHUB_BRANCH : 'main';
+		$api = defined( 'F2F_SAAS_API_BASE' ) && F2F_SAAS_API_BASE
+			? untrailingslashit( (string) F2F_SAAS_API_BASE )
+			: 'https://api.f2fbilisim.com';
+
 		return array(
+			$api . '/api/v1/wordpress/ob-ai-seo-blog/update',
 			'https://raw.githubusercontent.com/' . $repo . '/' . rawurlencode( $branch ) . '/updates/ob-ai-seo-blog.json',
 			'https://cdn.jsdelivr.net/gh/' . $repo . '@' . rawurlencode( $branch ) . '/updates/ob-ai-seo-blog.json',
 		);
@@ -34,6 +39,56 @@ class OB_AI_Updater {
 		add_filter( 'plugins_api', array( __CLASS__, 'plugins_api' ), 10, 3 );
 		add_action( 'upgrader_process_complete', array( __CLASS__, 'clear_cache' ), 10, 2 );
 		add_action( 'after_plugin_row_' . plugin_basename( OB_AI_SEO_BLOG_FILE ), array( __CLASS__, 'plugin_row_notice' ), 10, 2 );
+		add_filter( 'plugin_row_meta', array( __CLASS__, 'plugin_row_meta' ), 10, 2 );
+		add_action( 'admin_notices', array( __CLASS__, 'admin_plugins_notice' ) );
+	}
+
+	/**
+	 * @param array<int, string> $links
+	 * @param string             $file
+	 * @return array<int, string>
+	 */
+	public static function plugin_row_meta( $links, $file ) {
+		if ( plugin_basename( OB_AI_SEO_BLOG_FILE ) !== $file ) {
+			return $links;
+		}
+		$remote = self::remote_info();
+		if ( $remote && version_compare( $remote['version'], OB_AI_SEO_BLOG_VERSION, '>' ) ) {
+			$links[] = '<a href="' . esc_url( admin_url( 'plugins.php' ) ) . '"><strong>' . esc_html(
+				sprintf(
+					/* translators: %s version */
+					__( 'Güncelleme: %s', 'ob-ai-seo-blog' ),
+					$remote['version']
+				)
+			) . '</strong></a>';
+		}
+		$links[] = '<span>' . esc_html__( 'Sürüm', 'ob-ai-seo-blog' ) . ' ' . esc_html( OB_AI_SEO_BLOG_VERSION ) . '</span>';
+		return $links;
+	}
+
+	public static function admin_plugins_notice(): void {
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			return;
+		}
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'plugins' !== $screen->id ) {
+			return;
+		}
+		$remote = self::remote_info( true );
+		if ( ! $remote || version_compare( $remote['version'], OB_AI_SEO_BLOG_VERSION, '<=' ) ) {
+			return;
+		}
+		$zip = $remote['download_url'];
+		echo '<div class="notice notice-warning"><p><strong>OB AI SEO Blog:</strong> ';
+		printf(
+			/* translators: 1: current 2: new 3: download url */
+			esc_html__( 'Kurulu sürüm %1$s — yeni sürüm %2$s. WordPress güncellemesi görünmüyorsa zip indirip yükleyin: %3$s', 'ob-ai-seo-blog' ),
+			esc_html( OB_AI_SEO_BLOG_VERSION ),
+			esc_html( $remote['version'] ),
+			''
+		);
+		echo ' <a href="' . esc_url( $zip ) . '" target="_blank" rel="noopener">' . esc_html__( 'İndir', 'ob-ai-seo-blog' ) . '</a>';
+		echo '</p></div>';
 	}
 
 	/** @param mixed $transient */

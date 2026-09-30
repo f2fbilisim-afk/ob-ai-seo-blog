@@ -363,7 +363,7 @@ class OB_AI_Admin {
 									<td class="ob-ai-col-keyword"><input type="text" class="ob-ai-kw-input" placeholder="<?php esc_attr_e( 'örnek anahtar kelime', 'ob-ai-seo-blog' ); ?>" /></td>
 									<td><input type="date" class="ob-ai-date-input" /></td>
 									<td><input type="time" class="ob-ai-time-input" value="09:00" /></td>
-									<td><button type="button" class="ob-ai-btn-icon ob-ai-remove-row" title="<? esc_attr_e( 'Sil', 'ob-ai-seo-blog' ); ?>">&times;</button></td>
+									<td><button type="button" class="ob-ai-btn-icon ob-ai-remove-row" title="<?php esc_attr_e( 'Sil', 'ob-ai-seo-blog' ); ?>">&times;</button></td>
 								</tr>
 							</tbody>
 						</table>
@@ -408,7 +408,7 @@ class OB_AI_Admin {
 						<a class="ob-ai-link-refresh" href="<?php echo esc_url( admin_url( 'admin.php?page=ob-ai-seo-blog' . ( $batch_id ? '&batch_id=' . rawurlencode( $batch_id ) : '' ) ) ); ?>"><?php esc_html_e( 'Yenile', 'ob-ai-seo-blog' ); ?></a>
 					</div>
 					<?php if ( $batch_id ) : ?>
-						<p class="description" style="margin-top:0"><? esc_html_e( 'Batch:', 'ob-ai-seo-blog' ); ?> <code><?php echo esc_html( $batch_id ); ?></code></p>
+						<p class="description" style="margin-top:0"><?php esc_html_e( 'Batch:', 'ob-ai-seo-blog' ); ?> <code><?php echo esc_html( $batch_id ); ?></code></p>
 					<?php endif; ?>
 					<?php self::render_queue_table( $rows ); ?>
 					<p class="description" style="margin-top:12px">

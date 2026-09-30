@@ -1,11 +1,11 @@
 {
   "name": "OB AI SEO Blog",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "requires": "6.0",
   "tested": "6.7",
   "requires_php": "7.4",
   "homepage": "https://github.com/f2fbilisim-afk/ob-ai-seo-blog",
-  "download_url": "https://github.com/f2fbilisim-afk/ob-ai-seo-blog/releases/download/v1.0.3/ob-ai-seo-blog-1.0.3.zip",
+  "download_url": "https://github.com/f2fbilisim-afk/ob-ai-seo-blog/releases/download/v1.0.4/ob-ai-seo-blog-1.0.4.zip",
   "last_updated": "2026-09-30",
-  "changelog": "<ul><li>Yeni admin arayüzü (istatistikler, satır satır kelime, kuyruk tablosu)</li><li>Taslak / planlı yayın modları</li></ul>"
+  "changelog": "<ul><li>Güncelleme manifest api.f2fbilisim.com</li><li>Eklentiler sayfasında sürüm ve uyarı</li></ul>"
 }
