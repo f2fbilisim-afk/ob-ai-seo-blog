@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: OB AI SEO Blog
- * Plugin URI:  https://github.com/example/ob-ai-seo-blog
+ * Plugin URI:  https://github.com/f2fbilisim-afk/ob-ai-seo-blog
  * Description: Anahtar kelime listesinden OpenAI ile toplu SEO blog üretir, Rank Math alanlarını doldurur, kapak görseli ekler; anında veya planlı yayınlar.
  * Version:     1.0.0
  * Author:      OB
