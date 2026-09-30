@@ -49,6 +49,7 @@ class OB_AI_OpenAI {
 		$system = 'Sen deneyimli bir SEO içerik yazarısın. Yanıtını YALNIZCA geçerli JSON olarak ver; markdown code fence kullanma. '
 			. 'JSON şeması: {"title":"","slug":"","excerpt":"","meta_title":"","meta_description":"","content_html":"","image_prompt":"","inline_image_prompts":[]}. '
 			. 'content_html: WordPress için güvenli HTML (h2,h3,p,ul,ol,strong,em,figure,figcaption). '
+			. 'Makalenin sonuna "Sonuç", "Sonuç olarak", "Değerlendirme" vb. başlıklı ayrı kapanış bölümü EKLEME; son paragraf konuyu doğal bitirsin. '
 			. 'Odak anahtar kelime doğal biçimde title, meta, H2 ve gövdede geçsin. meta_description en fazla 155 karakter. '
 			. 'inline_image_prompts: içerikte kullanılacak ' . $inline . ' adet görsel için İngilizce DALL-E prompt listesi. '
 			. 'image_prompt: kapak görseli için İngilizce, fotoğraf tarzı, metinsiz prompt.';

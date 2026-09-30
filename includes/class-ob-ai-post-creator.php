@@ -18,7 +18,7 @@ class OB_AI_Post_Creator {
 			return $article;
 		}
 
-		$content_html = (string) $article['content_html'];
+		$content_html = self::strip_trailing_conclusion_section( (string) $article['content_html'] );
 		$featured_id  = 0;
 
 		if ( ! empty( $settings['generate_images'] ) ) {
@@ -92,6 +92,22 @@ class OB_AI_Post_Creator {
 	/**
 	 * @return int|WP_Error Attachment ID
 	 */
+	/**
+	 * Model bazen sona "Sonuç" H2 ekler; kaydetmeden kaldır.
+	 */
+	private static function strip_trailing_conclusion_section( string $html ): string {
+		$html = trim( $html );
+		if ( '' === $html ) {
+			return $html;
+		}
+		$pattern = '/<h[23][^>]*>\s*(?:Sonuç(?:lar)?(?:\s+ve\s+\w+)?|Sonuç\s+Olarak|Değerlendirme|Conclusion)\s*<\/h[23]>[\s\S]*$/iu';
+		$stripped = preg_replace( $pattern, '', $html );
+		if ( is_string( $stripped ) && $stripped !== $html ) {
+			return trim( $stripped );
+		}
+		return $html;
+	}
+
 	private static function attach_image_from_prompt( string $prompt, string $title, array $settings ) {
 		$file = OB_AI_OpenAI::generate_image_file( $prompt, $settings );
 		if ( is_wp_error( $file ) ) {
