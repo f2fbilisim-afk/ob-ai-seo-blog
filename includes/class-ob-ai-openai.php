@@ -4,15 +4,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Üretim katmanı: varsayılan SaaS API; isteğe bağlı doğrudan OpenAI (geliştirici modu).
+ */
 class OB_AI_OpenAI {
 
 	/**
 	 * @return array|WP_Error
 	 */
 	public static function generate_article( string $focus_keyword, array $settings ) {
+		if ( OB_AI_SaaS_Client::is_configured() ) {
+			return OB_AI_SaaS_Client::generate_article( $focus_keyword, $settings );
+		}
+		return self::generate_article_direct( $focus_keyword, $settings );
+	}
+
+	/**
+	 * @return array{path:string,mime:string}|WP_Error
+	 */
+	public static function generate_image_file( string $prompt, array $settings ) {
+		if ( OB_AI_SaaS_Client::is_configured() ) {
+			return OB_AI_SaaS_Client::generate_image_file( $prompt, $settings );
+		}
+		return self::generate_image_file_direct( $prompt, $settings );
+	}
+
+	/**
+	 * @return array|WP_Error
+	 */
+	private static function generate_article_direct( string $focus_keyword, array $settings ) {
 		$api_key = OB_AI_Settings::get_api_key();
 		if ( ! $api_key ) {
-			return new WP_Error( 'no_api_key', __( 'OpenAI API anahtarı tanımlı değil.', 'ob-ai-seo-blog' ) );
+			return new WP_Error(
+				'no_api_key',
+				__( 'Lisans veya OpenAI API anahtarı tanımlı değil.', 'ob-ai-seo-blog' )
+			);
 		}
 
 		$lang   = $settings['language'] ?? 'tr';
@@ -79,7 +105,7 @@ class OB_AI_OpenAI {
 	/**
 	 * @return array{path:string,mime:string}|WP_Error
 	 */
-	public static function generate_image_file( string $prompt, array $settings ) {
+	private static function generate_image_file_direct( string $prompt, array $settings ) {
 		$api_key = OB_AI_Settings::get_api_key();
 		if ( ! $api_key ) {
 			return new WP_Error( 'no_api_key', __( 'OpenAI API anahtarı tanımlı değil.', 'ob-ai-seo-blog' ) );

@@ -115,7 +115,7 @@ class OB_AI_Admin {
 		$interval = max( 1, absint( $_POST['interval_minutes'] ?? 60 ) );
 
 		$batch_id = OB_AI_Queue::enqueue_batch(
-			$keywords,
+			$items,
 			$schedule_enabled ? $schedule_start : null,
 			$interval
 		);
@@ -160,7 +160,8 @@ class OB_AI_Admin {
 						<?php wp_nonce_field( 'ob_ai_seo_blog_generate' ); ?>
 
 						<label for="ob-ai-keywords" class="screen-reader-text"><? esc_html_e( 'Anahtar kelimeler', 'ob-ai-seo-blog' ); ?></label>
-						<textarea name="keywords" id="ob-ai-keywords" rows="12" class="large-text code" placeholder="<?php esc_attr_e( "Bursa web tasarım\nBursa e-ticaret", 'ob-ai-seo-blog' ); ?>"></textarea>
+						<textarea name="keywords" id="ob-ai-keywords" rows="12" class="large-text code" placeholder="<?php esc_attr_e( "Bursa web tasarım\nBursa e-ticaret | 2026-10-15 09:00", 'ob-ai-seo-blog' ); ?>"></textarea>
+						<p class="description"><?php esc_html_e( 'İsteğe bağlı: satır sonuna | YYYY-MM-DD HH:MM ekleyerek o makaleyi ayrı planlayabilirsiniz.', 'ob-ai-seo-blog' ); ?></p>
 
 						<fieldset class="ob-ai-schedule">
 							<legend><?php esc_html_e( 'Yayın planı', 'ob-ai-seo-blog' ); ?></legend>
@@ -257,14 +258,47 @@ class OB_AI_Admin {
 		?>
 		<div class="wrap ob-ai-wrap">
 			<h1><?php esc_html_e( 'AI SEO Blog Ayarları', 'ob-ai-seo-blog' ); ?></h1>
+			<?php
+			$usage = OB_AI_SaaS_Client::get_usage();
+			if ( ! is_wp_error( $usage ) && ! empty( $usage['usage'] ) ) :
+				?>
+				<div class="notice notice-info">
+					<p>
+						<strong><?php esc_html_e( 'SaaS kotası', 'ob-ai-seo-blog' ); ?>:</strong>
+						<?php
+						printf(
+							/* translators: 1: package name 2: used 3: limit */
+							esc_html__( 'Paket %1$s — bu ay %2$s / %3$s token', 'ob-ai-seo-blog' ),
+							esc_html( $usage['package']['name'] ?? '' ),
+							esc_html( number_format_i18n( (int) ( $usage['usage']['tokens_used'] ?? 0 ) ) ),
+							esc_html( number_format_i18n( (int) ( $usage['usage']['tokens_limit'] ?? 0 ) ) )
+						);
+						?>
+					</p>
+				</div>
+			<?php endif; ?>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'ob_ai_seo_blog_settings_group' ); ?>
 				<table class="form-table" role="presentation">
 					<tr>
-						<th scope="row"><label for="openai_api_key"><?php esc_html_e( 'OpenAI API Key', 'ob-ai-seo-blog' ); ?></label></th>
+						<th scope="row"><label for="saas_api_base"><?php esc_html_e( 'SaaS API adresi', 'ob-ai-seo-blog' ); ?></label></th>
+						<td>
+							<input type="url" id="saas_api_base" name="<?php echo esc_attr( OB_AI_Settings::OPTION_KEY ); ?>[saas_api_base]" value="<?php echo esc_attr( $s['saas_api_base'] ); ?>" class="regular-text" placeholder="https://api.ornek.com" />
+							<p class="description"><?php esc_html_e( 'Müşteri eklentisi yalnızca bu adrese bağlanır; OpenAI anahtarı sunucunuzda kalır.', 'ob-ai-seo-blog' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="license_key"><?php esc_html_e( 'Lisans anahtarı', 'ob-ai-seo-blog' ); ?></label></th>
+						<td>
+							<input type="text" id="license_key" name="<?php echo esc_attr( OB_AI_Settings::OPTION_KEY ); ?>[license_key]" value="<?php echo esc_attr( $s['license_key'] ); ?>" class="regular-text code" autocomplete="off" />
+							<p class="description"><?php esc_html_e( 'Alternatif: define(\'OB_AI_LICENSE_KEY\', \'OBAI-...\');', 'ob-ai-seo-blog' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="openai_api_key"><?php esc_html_e( 'OpenAI API Key (geliştirici)', 'ob-ai-seo-blog' ); ?></label></th>
 						<td>
 							<input type="password" id="openai_api_key" name="<?php echo esc_attr( OB_AI_Settings::OPTION_KEY ); ?>[openai_api_key]" value="<?php echo esc_attr( $s['openai_api_key'] ); ?>" class="regular-text" autocomplete="off" />
-							<p class="description"><?php esc_html_e( 'Alternatif: wp-config.php içinde define(\'OB_OPENAI_API_KEY\', \'sk-...\');', 'ob-ai-seo-blog' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Yalnızca SaaS kapalıyken (lisans/API boş) doğrudan OpenAI için kullanılır.', 'ob-ai-seo-blog' ); ?></p>
 						</td>
 					</tr>
 					<tr>

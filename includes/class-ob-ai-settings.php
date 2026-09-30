@@ -14,6 +14,8 @@ class OB_AI_Settings {
 
 	public static function defaults(): array {
 		return array(
+			'saas_api_base'      => '',
+			'license_key'        => '',
 			'openai_api_key'     => '',
 			'text_model'         => 'gpt-4o-mini',
 			'image_model'        => 'gpt-image-1',
@@ -54,6 +56,8 @@ class OB_AI_Settings {
 		$out  = self::defaults();
 		$data = is_array( $input ) ? $input : array();
 
+		$out['saas_api_base'] = esc_url_raw( trim( $data['saas_api_base'] ?? '' ) );
+		$out['license_key']   = sanitize_text_field( $data['license_key'] ?? '' );
 		if ( isset( $data['openai_api_key'] ) ) {
 			$out['openai_api_key'] = sanitize_text_field( $data['openai_api_key'] );
 		}

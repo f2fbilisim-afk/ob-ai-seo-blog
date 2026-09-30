@@ -132,6 +132,7 @@ class OB_AI_Queue {
 				array( '%s', '%s', '%s' ),
 				array( '%d' )
 			);
+			self::schedule_next_if_pending();
 			return;
 		}
 
@@ -147,6 +148,12 @@ class OB_AI_Queue {
 			array( '%d' )
 		);
 
+		self::schedule_next_if_pending();
+	}
+
+	private static function schedule_next_if_pending(): void {
+		global $wpdb;
+		$table   = self::table_name();
 		$pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status = 'pending'" );
 		if ( $pending > 0 ) {
 			wp_schedule_single_event( time() + 15, 'ob_ai_seo_blog_process_queue' );
