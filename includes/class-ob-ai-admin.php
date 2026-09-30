@@ -14,22 +14,31 @@ class OB_AI_Admin {
 
 	public static function menu(): void {
 		add_menu_page(
-			__( 'AI SEO Blog', 'ob-ai-seo-blog' ),
-			__( 'AI SEO Blog', 'ob-ai-seo-blog' ),
+			__( 'AI SEO İçerik Üretimi', 'ob-ai-seo-blog' ),
+			__( 'AI SEO', 'ob-ai-seo-blog' ),
 			'publish_posts',
 			'ob-ai-seo-blog',
 			array( __CLASS__, 'render_generator' ),
-			'dashicons-edit-large',
+			'dashicons-star-filled',
 			58
 		);
 
 		add_submenu_page(
 			'ob-ai-seo-blog',
-			__( 'Toplu Üret', 'ob-ai-seo-blog' ),
-			__( 'Toplu Üret', 'ob-ai-seo-blog' ),
+			__( 'İçerik Üretimi', 'ob-ai-seo-blog' ),
+			__( 'İçerik Üretimi', 'ob-ai-seo-blog' ),
 			'publish_posts',
 			'ob-ai-seo-blog',
 			array( __CLASS__, 'render_generator' )
+		);
+
+		add_submenu_page(
+			'ob-ai-seo-blog',
+			__( 'Kuyruk', 'ob-ai-seo-blog' ),
+			__( 'Kuyruk', 'ob-ai-seo-blog' ),
+			'publish_posts',
+			'ob-ai-seo-blog-queue',
+			array( __CLASS__, 'render_queue' )
 		);
 
 		add_submenu_page(
@@ -61,63 +70,110 @@ class OB_AI_Admin {
 		);
 	}
 
+	/**
+	 * @return array<int, array{keyword:string, publish_local:?string}>
+	 */
+	private static function parse_keyword_items_from_request(): array {
+		$items = array();
+		if ( ! empty( $_POST['ob_ai_rows'] ) && is_array( $_POST['ob_ai_rows'] ) ) {
+			foreach ( wp_unslash( $_POST['ob_ai_rows'] ) as $row ) {
+				if ( ! is_array( $row ) ) {
+					continue;
+				}
+				$keyword = sanitize_text_field( $row['keyword'] ?? '' );
+				if ( '' === $keyword ) {
+					continue;
+				}
+				$date   = sanitize_text_field( $row['date'] ?? '' );
+				$time   = sanitize_text_field( $row['time'] ?? '09:00' );
+				$local  = null;
+				if ( $date ) {
+					$local = trim( $date . ' ' . ( $time ?: '09:00' ) );
+					$local = str_replace( 'T', ' ', $local );
+					if ( 16 === strlen( $local ) ) {
+						$local .= ':00';
+					}
+				}
+				$items[] = array(
+					'keyword'       => $keyword,
+					'publish_local' => $local,
+				);
+			}
+		}
+
+		if ( empty( $items ) ) {
+			$raw   = isset( $_POST['keywords'] ) ? wp_unslash( $_POST['keywords'] ) : '';
+			$lines = preg_split( '/\r\n|\r|\n/', (string) $raw );
+			foreach ( $lines as $line ) {
+				$line = trim( $line );
+				if ( '' === $line ) {
+					continue;
+				}
+				$keyword       = $line;
+				$publish_local = null;
+				if ( false !== strpos( $line, '|' ) ) {
+					$parts         = array_map( 'trim', explode( '|', $line, 2 ) );
+					$keyword       = $parts[0];
+					$publish_local = $parts[1] ?? null;
+				}
+				if ( '' === $keyword ) {
+					continue;
+				}
+				$items[] = array(
+					'keyword'       => $keyword,
+					'publish_local' => $publish_local,
+				);
+			}
+		}
+
+		return $items;
+	}
+
 	public static function handle_generate(): void {
 		if ( ! current_user_can( 'publish_posts' ) ) {
 			wp_die( esc_html__( 'Yetkiniz yok.', 'ob-ai-seo-blog' ) );
 		}
 		check_admin_referer( 'ob_ai_seo_blog_generate' );
 
-		$raw   = isset( $_POST['keywords'] ) ? wp_unslash( $_POST['keywords'] ) : '';
-		$lines = preg_split( '/\r\n|\r|\n/', (string) $raw );
-		$items = array();
-		foreach ( $lines as $line ) {
-			$line = trim( $line );
-			if ( '' === $line ) {
-				continue;
-			}
-			$keyword       = $line;
-			$publish_local = null;
-			if ( false !== strpos( $line, '|' ) ) {
-				$parts         = array_map( 'trim', explode( '|', $line, 2 ) );
-				$keyword       = $parts[0];
-				$publish_local = $parts[1] ?? null;
-				if ( $publish_local ) {
-					$publish_local = str_replace( 'T', ' ', $publish_local );
-					if ( 16 === strlen( $publish_local ) ) {
-						$publish_local .= ':00';
-					}
-				}
-			}
-			if ( '' === $keyword ) {
-				continue;
-			}
-			$items[] = array(
-				'keyword'       => $keyword,
-				'publish_local' => $publish_local,
-			);
-		}
-
+		$items = self::parse_keyword_items_from_request();
 		if ( empty( $items ) ) {
 			wp_safe_redirect( add_query_arg( 'ob_ai_error', 'empty', admin_url( 'admin.php?page=ob-ai-seo-blog' ) ) );
 			exit;
 		}
 
-		$schedule_enabled = ! empty( $_POST['schedule_enabled'] );
-		$schedule_start   = '';
-		if ( $schedule_enabled && ! empty( $_POST['schedule_start'] ) ) {
-			$schedule_start = sanitize_text_field( wp_unslash( $_POST['schedule_start'] ) );
-			$schedule_start = str_replace( 'T', ' ', $schedule_start );
-			if ( strlen( $schedule_start ) === 16 ) {
-				$schedule_start .= ':00';
+		$mode = sanitize_text_field( wp_unslash( $_POST['publish_mode'] ?? 'immediate' ) );
+		if ( ! in_array( $mode, array( 'immediate', 'draft', 'scheduled' ), true ) ) {
+			$mode = 'immediate';
+		}
+
+		$unit  = sanitize_text_field( wp_unslash( $_POST['interval_unit'] ?? 'day' ) );
+		$mult  = array(
+			'minute' => 1,
+			'hour'   => 60,
+			'day'    => 1440,
+		);
+		$interval = max( 1, absint( $_POST['interval_value'] ?? 1 ) ) * ( $mult[ $unit ] ?? 1440 );
+
+		$default_post_status = 'publish';
+		$schedule_start      = null;
+		if ( 'draft' === $mode ) {
+			$default_post_status = 'draft';
+		} elseif ( 'scheduled' === $mode ) {
+			$default_post_status = 'future';
+			if ( ! empty( $_POST['schedule_start'] ) ) {
+				$schedule_start = sanitize_text_field( wp_unslash( $_POST['schedule_start'] ) );
+				$schedule_start = str_replace( 'T', ' ', $schedule_start );
+				if ( 16 === strlen( $schedule_start ) ) {
+					$schedule_start .= ':00';
+				}
 			}
 		}
 
-		$interval = max( 1, absint( $_POST['interval_minutes'] ?? 60 ) );
-
 		$batch_id = OB_AI_Queue::enqueue_batch(
 			$items,
-			$schedule_enabled ? $schedule_start : null,
-			$interval
+			'scheduled' === $mode ? $schedule_start : null,
+			$interval,
+			$default_post_status
 		);
 
 		wp_safe_redirect(
@@ -132,119 +188,267 @@ class OB_AI_Admin {
 		exit;
 	}
 
+	/**
+	 * @param object $row Queue row.
+	 * @return array{key:string, label:string}
+	 */
+	public static function row_display_status( $row ): array {
+		if ( 'processing' === $row->status ) {
+			return array(
+				'key'   => 'creating',
+				'label' => __( 'Oluşturuluyor', 'ob-ai-seo-blog' ),
+			);
+		}
+		if ( 'failed' === $row->status ) {
+			return array(
+				'key'   => 'error',
+				'label' => __( 'Hatalı', 'ob-ai-seo-blog' ),
+			);
+		}
+		if ( 'pending' === $row->status ) {
+			return array(
+				'key'   => 'queued',
+				'label' => __( 'Kuyrukta', 'ob-ai-seo-blog' ),
+			);
+		}
+		if ( 'done' === $row->status && $row->post_id ) {
+			$ps = get_post_status( (int) $row->post_id );
+			if ( 'future' === $ps ) {
+				return array(
+					'key'   => 'planned',
+					'label' => __( 'Planlandı', 'ob-ai-seo-blog' ),
+				);
+			}
+			if ( 'draft' === $ps ) {
+				return array(
+					'key'   => 'draft',
+					'label' => __( 'Taslak', 'ob-ai-seo-blog' ),
+				);
+			}
+			return array(
+				'key'   => 'live',
+				'label' => __( 'Yayında', 'ob-ai-seo-blog' ),
+			);
+		}
+		return array(
+			'key'   => 'queued',
+			'label' => __( 'Tamamlandı', 'ob-ai-seo-blog' ),
+		);
+	}
+
+	/**
+	 * @param array<int, object> $rows Rows.
+	 */
+	public static function render_queue_table( array $rows ): void {
+		if ( empty( $rows ) ) {
+			echo '<p class="ob-ai-empty">' . esc_html__( 'Henüz kuyruk kaydı yok. Sol taraftan içerik üretin.', 'ob-ai-seo-blog' ) . '</p>';
+			return;
+		}
+		?>
+		<table class="ob-ai-queue-table">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Anahtar kelime', 'ob-ai-seo-blog' ); ?></th>
+					<th><?php esc_html_e( 'Durum', 'ob-ai-seo-blog' ); ?></th>
+					<th><?php esc_html_e( 'Yayın tarihi', 'ob-ai-seo-blog' ); ?></th>
+					<th><?php esc_html_e( 'İşlem', 'ob-ai-seo-blog' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php
+				foreach ( $rows as $row ) :
+					$st      = self::row_display_status( $row );
+					$date_ts = $row->publish_at_gmt ? strtotime( $row->publish_at_gmt . ' UTC' ) : false;
+					?>
+					<tr>
+						<td><?php echo esc_html( $row->focus_keyword ); ?></td>
+						<td>
+							<span class="ob-ai-badge ob-ai-badge--<?php echo esc_attr( $st['key'] ); ?>"><?php echo esc_html( $st['label'] ); ?></span>
+							<?php if ( 'creating' === $st['key'] ) : ?>
+								<div class="ob-ai-progress" aria-hidden="true"><span></span></div>
+							<?php endif; ?>
+							<?php if ( $row->error_message ) : ?>
+								<span class="ob-ai-row-error"><?php echo esc_html( $row->error_message ); ?></span>
+							<?php endif; ?>
+						</td>
+						<td>
+							<?php
+							if ( $date_ts ) {
+								echo esc_html( wp_date( 'd M Y H:i', $date_ts ) );
+							} else {
+								echo '—';
+							}
+							?>
+						</td>
+						<td class="ob-ai-actions">
+							<?php if ( $row->post_id ) : ?>
+								<a href="<?php echo esc_url( get_permalink( (int) $row->post_id ) ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Görüntüle', 'ob-ai-seo-blog' ); ?></a>
+								<a href="<?php echo esc_url( get_edit_post_link( (int) $row->post_id ) ); ?>"><?php esc_html_e( 'Düzenle', 'ob-ai-seo-blog' ); ?></a>
+							<?php elseif ( 'failed' === $row->status ) : ?>
+								<span class="ob-ai-text-muted"><?php esc_html_e( 'Yeniden kuyruğa almak için kelimeyi tekrar ekleyin.', 'ob-ai-seo-blog' ); ?></span>
+							<?php else : ?>
+								—
+							<?php endif; ?>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
+		<?php
+	}
+
 	public static function render_generator(): void {
 		if ( ! current_user_can( 'publish_posts' ) ) {
 			return;
 		}
 
+		$stats    = OB_AI_Queue::dashboard_stats();
 		$batch_id = isset( $_GET['batch_id'] ) ? sanitize_text_field( wp_unslash( $_GET['batch_id'] ) ) : '';
-		$rows     = $batch_id ? OB_AI_Queue::get_batch_rows( $batch_id ) : array();
-		$batches  = OB_AI_Queue::recent_batches( 8 );
+		$rows     = $batch_id ? OB_AI_Queue::get_batch_rows( $batch_id ) : OB_AI_Queue::recent_queue_rows( 12 );
 
 		?>
-		<div class="wrap ob-ai-wrap">
-			<h1><?php esc_html_e( 'OpenAI Toplu SEO Blog', 'ob-ai-seo-blog' ); ?></h1>
-			<p class="description">
-				<?php esc_html_e( 'Her satıra bir odak anahtar kelime yazın. Üretim kuyruğa alınır; hazır olanlar anında yayınlanır veya seçtiğiniz tarihte WordPress planlı yayın olarak kaydedilir. Rank Math meta alanları otomatik doldurulur.', 'ob-ai-seo-blog' ); ?>
-			</p>
+		<div class="wrap ob-ai-app">
+			<div class="ob-ai-header">
+				<div>
+					<h1><?php esc_html_e( 'AI SEO İçerik Üretimi', 'ob-ai-seo-blog' ); ?></h1>
+					<p class="ob-ai-lead">
+						<?php esc_html_e( 'Anahtar kelimelerinizi ekleyin, SEO uyumlu içerikler oluşturun ve yayın sürecini yönetin.', 'ob-ai-seo-blog' ); ?>
+					</p>
+				</div>
+				<button type="button" class="ob-ai-btn-help" id="ob-ai-help-btn"><?php esc_html_e( 'Nasıl çalışır?', 'ob-ai-seo-blog' ); ?></button>
+			</div>
 
 			<?php if ( isset( $_GET['ob_ai_error'] ) && 'empty' === $_GET['ob_ai_error'] ) : ?>
 				<div class="notice notice-error"><p><?php esc_html_e( 'En az bir anahtar kelime girin.', 'ob-ai-seo-blog' ); ?></p></div>
 			<?php endif; ?>
 
-			<div class="ob-ai-grid">
-				<div class="ob-ai-card">
-					<h2><?php esc_html_e( 'Anahtar kelimeler', 'ob-ai-seo-blog' ); ?></h2>
-					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<div class="ob-ai-stats">
+				<div class="ob-ai-stat">
+					<div class="ob-ai-stat-label"><?php esc_html_e( 'Üretilen', 'ob-ai-seo-blog' ); ?></div>
+					<div class="ob-ai-stat-value"><?php echo esc_html( (string) $stats['produced'] ); ?></div>
+				</div>
+				<div class="ob-ai-stat ob-ai-stat--queue">
+					<div class="ob-ai-stat-label"><?php esc_html_e( 'Kuyrukta', 'ob-ai-seo-blog' ); ?></div>
+					<div class="ob-ai-stat-value"><?php echo esc_html( (string) $stats['queued'] ); ?></div>
+				</div>
+				<div class="ob-ai-stat ob-ai-stat--planned">
+					<div class="ob-ai-stat-label"><?php esc_html_e( 'Planlanan', 'ob-ai-seo-blog' ); ?></div>
+					<div class="ob-ai-stat-value"><?php echo esc_html( (string) $stats['planned'] ); ?></div>
+				</div>
+				<div class="ob-ai-stat ob-ai-stat--failed">
+					<div class="ob-ai-stat-label"><?php esc_html_e( 'Hatalı', 'ob-ai-seo-blog' ); ?></div>
+					<div class="ob-ai-stat-value"><?php echo esc_html( (string) $stats['failed'] ); ?></div>
+				</div>
+			</div>
+
+			<div class="ob-ai-layout">
+				<div class="ob-ai-panel">
+					<h2><?php esc_html_e( 'Yeni İçerik Üret', 'ob-ai-seo-blog' ); ?></h2>
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="ob-ai-generate-form">
 						<input type="hidden" name="action" value="ob_ai_seo_blog_generate" />
 						<?php wp_nonce_field( 'ob_ai_seo_blog_generate' ); ?>
+						<div id="ob-ai-rows-hidden"></div>
 
-						<label for="ob-ai-keywords" class="screen-reader-text"><? esc_html_e( 'Anahtar kelimeler', 'ob-ai-seo-blog' ); ?></label>
-						<textarea name="keywords" id="ob-ai-keywords" rows="12" class="large-text code" placeholder="<?php esc_attr_e( "Bursa web tasarım\nBursa e-ticaret | 2026-10-15 09:00", 'ob-ai-seo-blog' ); ?>"></textarea>
-						<p class="description"><?php esc_html_e( 'İsteğe bağlı: satır sonuna | YYYY-MM-DD HH:MM ekleyerek o makaleyi ayrı planlayabilirsiniz.', 'ob-ai-seo-blog' ); ?></p>
-
-						<fieldset class="ob-ai-schedule">
-							<legend><?php esc_html_e( 'Yayın planı', 'ob-ai-seo-blog' ); ?></legend>
-							<label>
-								<input type="checkbox" name="schedule_enabled" id="ob-ai-schedule-enabled" value="1" />
-								<?php esc_html_e( 'Planla (ilk satır seçilen saatte, sonrakiler aralık kadar gecikmeli)', 'ob-ai-seo-blog' ); ?>
-							</label>
-							<div class="ob-ai-schedule-fields" hidden>
-								<p>
-									<label for="ob-ai-schedule-start"><?php esc_html_e( 'Başlangıç tarihi ve saati', 'ob-ai-seo-blog' ); ?></label><br />
-									<input type="datetime-local" name="schedule_start" id="ob-ai-schedule-start" />
-								</p>
-								<p>
-									<label for="ob-ai-interval"><?php esc_html_e( 'Makaleler arası (dakika)', 'ob-ai-seo-blog' ); ?></label><br />
-									<input type="number" name="interval_minutes" id="ob-ai-interval" value="1440" min="1" step="1" class="small-text" />
-									<span class="description"><?php esc_html_e( 'Örn. 1440 = her gün bir makale', 'ob-ai-seo-blog' ); ?></span>
-								</p>
-							</div>
-							<p class="description">
-								<?php esc_html_e( 'Plan kapalıyken her makale üretildiği anda yayınlanır (taslak yok). Plan açıkken WordPress “planlanmış” durumuna yazar; saat gelince otomatik yayınlanır.', 'ob-ai-seo-blog' ); ?>
-							</p>
-						</fieldset>
-
-						<?php submit_button( __( 'Toplu üret', 'ob-ai-seo-blog' ), 'primary', 'submit', false ); ?>
-					</form>
-				</div>
-
-				<div class="ob-ai-card">
-					<h2><?php esc_html_e( 'Kuyruk durumu', 'ob-ai-seo-blog' ); ?></h2>
-					<?php if ( $batch_id && $rows ) : ?>
-						<p><strong><?php esc_html_e( 'Batch:', 'ob-ai-seo-blog' ); ?></strong> <code><?php echo esc_html( $batch_id ); ?></code></p>
-						<p class="description"><?php esc_html_e( 'Sayfa birkaç dakika içinde yenilendiğinde ilerlemeyi görebilirsiniz. İşlem arka planda dakikada bir çalışır.', 'ob-ai-seo-blog' ); ?></p>
-						<table class="widefat striped">
+						<table class="ob-ai-kw-table">
 							<thead>
 								<tr>
 									<th><?php esc_html_e( 'Anahtar kelime', 'ob-ai-seo-blog' ); ?></th>
-									<th><?php esc_html_e( 'Yayın (site saati)', 'ob-ai-seo-blog' ); ?></th>
-									<th><?php esc_html_e( 'Durum', 'ob-ai-seo-blog' ); ?></th>
-									<th><?php esc_html_e( 'Yazı', 'ob-ai-seo-blog' ); ?></th>
+									<th><?php esc_html_e( 'Tarih', 'ob-ai-seo-blog' ); ?></th>
+									<th><?php esc_html_e( 'Saat', 'ob-ai-seo-blog' ); ?></th>
+									<th></th>
 								</tr>
 							</thead>
-							<tbody>
-								<?php foreach ( $rows as $row ) : ?>
-									<tr>
-										<td><?php echo esc_html( $row->focus_keyword ); ?></td>
-										<td><?php echo esc_html( get_date_from_gmt( $row->publish_at_gmt, 'Y-m-d H:i' ) ); ?></td>
-										<td><span class="ob-ai-status ob-ai-status-<?php echo esc_attr( $row->status ); ?>"><?php echo esc_html( $row->status ); ?></span>
-											<?php if ( $row->error_message ) : ?>
-												<br /><small><?php echo esc_html( $row->error_message ); ?></small>
-											<?php endif; ?>
-										</td>
-										<td>
-											<?php if ( $row->post_id ) : ?>
-												<a href="<?php echo esc_url( get_edit_post_link( (int) $row->post_id ) ); ?>"><?php esc_html_e( 'Düzenle', 'ob-ai-seo-blog' ); ?></a>
-											<?php else : ?>
-												—
-											<?php endif; ?>
-										</td>
-									</tr>
-								<?php endforeach; ?>
+							<tbody id="ob-ai-kw-rows">
+								<tr class="ob-ai-kw-row">
+									<td class="ob-ai-col-keyword"><input type="text" class="ob-ai-kw-input" placeholder="<?php esc_attr_e( 'örnek anahtar kelime', 'ob-ai-seo-blog' ); ?>" /></td>
+									<td><input type="date" class="ob-ai-date-input" /></td>
+									<td><input type="time" class="ob-ai-time-input" value="09:00" /></td>
+									<td><button type="button" class="ob-ai-btn-icon ob-ai-remove-row" title="<? esc_attr_e( 'Sil', 'ob-ai-seo-blog' ); ?>">&times;</button></td>
+								</tr>
 							</tbody>
 						</table>
-					<?php else : ?>
-						<p><?php esc_html_e( 'Henüz batch seçilmedi. Üretim başlattıktan sonra burada ilerleme listelenir.', 'ob-ai-seo-blog' ); ?></p>
-					<?php endif; ?>
+						<button type="button" class="ob-ai-btn-add" id="ob-ai-add-row">+ <?php esc_html_e( 'Anahtar Kelime Ekle', 'ob-ai-seo-blog' ); ?></button>
 
-					<?php if ( $batches ) : ?>
-						<h3><?php esc_html_e( 'Son batch\'ler', 'ob-ai-seo-blog' ); ?></h3>
-						<ul class="ob-ai-batch-list">
-							<?php foreach ( $batches as $b ) : ?>
-								<li>
-									<a href="<?php echo esc_url( add_query_arg( 'batch_id', $b->batch_id, admin_url( 'admin.php?page=ob-ai-seo-blog' ) ) ); ?>">
-										<code><?php echo esc_html( $b->batch_id ); ?></code>
-									</a>
-									— <?php echo esc_html( (int) $b->done_count . '/' . (int) $b->total ); ?>
-									<?php if ( (int) $b->failed_count > 0 ) : ?>
-										<span class="ob-ai-failed">(<?php echo esc_html( (int) $b->failed_count ); ?> failed)</span>
-									<?php endif; ?>
-								</li>
-							<?php endforeach; ?>
-						</ul>
-					<?php endif; ?>
+						<fieldset class="ob-ai-publish-mode">
+							<legend><?php esc_html_e( 'Yayın ayarları', 'ob-ai-seo-blog' ); ?></legend>
+							<label class="ob-ai-radio">
+								<input type="radio" name="publish_mode" value="immediate" checked />
+								<?php esc_html_e( 'Hemen yayınla', 'ob-ai-seo-blog' ); ?>
+							</label>
+							<label class="ob-ai-radio">
+								<input type="radio" name="publish_mode" value="draft" />
+								<?php esc_html_e( 'Taslak olarak kaydet', 'ob-ai-seo-blog' ); ?>
+							</label>
+							<label class="ob-ai-radio">
+								<input type="radio" name="publish_mode" value="scheduled" />
+								<?php esc_html_e( 'Planlanan tarihte yayınla', 'ob-ai-seo-blog' ); ?>
+							</label>
+							<div class="ob-ai-schedule-batch" hidden>
+								<label for="ob-ai-schedule-start"><?php esc_html_e( 'İlk yayın (satırda tarih yoksa)', 'ob-ai-seo-blog' ); ?></label><br />
+								<input type="datetime-local" name="schedule_start" id="ob-ai-schedule-start" />
+							</div>
+							<div class="ob-ai-interval">
+								<span><?php esc_html_e( 'İçerikler arası yayın aralığı', 'ob-ai-seo-blog' ); ?></span>
+								<input type="number" name="interval_value" value="1" min="1" step="1" />
+								<select name="interval_unit">
+									<option value="day"><?php esc_html_e( 'Gün', 'ob-ai-seo-blog' ); ?></option>
+									<option value="hour"><?php esc_html_e( 'Saat', 'ob-ai-seo-blog' ); ?></option>
+									<option value="minute"><?php esc_html_e( 'Dakika', 'ob-ai-seo-blog' ); ?></option>
+								</select>
+							</div>
+						</fieldset>
+
+						<button type="submit" class="ob-ai-submit"><?php esc_html_e( 'İçerikleri Üret', 'ob-ai-seo-blog' ); ?></button>
+					</form>
 				</div>
+
+				<div class="ob-ai-panel">
+					<div class="ob-ai-panel-head">
+						<h2><?php esc_html_e( 'İçerik kuyruğu', 'ob-ai-seo-blog' ); ?></h2>
+						<a class="ob-ai-link-refresh" href="<?php echo esc_url( admin_url( 'admin.php?page=ob-ai-seo-blog' . ( $batch_id ? '&batch_id=' . rawurlencode( $batch_id ) : '' ) ) ); ?>"><?php esc_html_e( 'Yenile', 'ob-ai-seo-blog' ); ?></a>
+					</div>
+					<?php if ( $batch_id ) : ?>
+						<p class="description" style="margin-top:0"><? esc_html_e( 'Batch:', 'ob-ai-seo-blog' ); ?> <code><?php echo esc_html( $batch_id ); ?></code></p>
+					<?php endif; ?>
+					<?php self::render_queue_table( $rows ); ?>
+					<p class="description" style="margin-top:12px">
+						<a href="<?php echo esc_url( admin_url( 'admin.php?page=ob-ai-seo-blog-queue' ) ); ?>"><?php esc_html_e( 'Tüm kuyruğu gör →', 'ob-ai-seo-blog' ); ?></a>
+					</p>
+				</div>
+			</div>
+
+			<dialog class="ob-ai-help-dialog" id="ob-ai-help-dialog">
+				<div class="ob-ai-help-inner">
+					<h3><?php esc_html_e( 'Nasıl çalışır?', 'ob-ai-seo-blog' ); ?></h3>
+					<ol>
+						<li><?php esc_html_e( 'Anahtar kelime satırlarını doldurun; isteğe bağlı tarih/saat ekleyin.', 'ob-ai-seo-blog' ); ?></li>
+						<li><?php esc_html_e( 'Yayın modunu seçin (hemen, taslak veya planlı).', 'ob-ai-seo-blog' ); ?></li>
+						<li><?php esc_html_e( 'İçerikleri Üret — işlem arka planda dakikada bir işlenir.', 'ob-ai-seo-blog' ); ?></li>
+						<li><?php esc_html_e( 'Kuyruk tablosundan durumu takip edin; Rank Math alanları otomatik dolar.', 'ob-ai-seo-blog' ); ?></li>
+					</ol>
+					<button type="button" class="ob-ai-help-close" id="ob-ai-help-close"><?php esc_html_e( 'Tamam', 'ob-ai-seo-blog' ); ?></button>
+				</div>
+			</dialog>
+		</div>
+		<?php
+	}
+
+	public static function render_queue(): void {
+		if ( ! current_user_can( 'publish_posts' ) ) {
+			return;
+		}
+		$rows = OB_AI_Queue::recent_queue_rows( 100 );
+		?>
+		<div class="wrap ob-ai-app">
+			<div class="ob-ai-header">
+				<div>
+					<h1><?php esc_html_e( 'İçerik kuyruğu', 'ob-ai-seo-blog' ); ?></h1>
+					<p class="ob-ai-lead"><?php esc_html_e( 'Tüm üretim işlerinin durumu.', 'ob-ai-seo-blog' ); ?></p>
+				</div>
+				<a class="ob-ai-btn-help" href="<?php echo esc_url( admin_url( 'admin.php?page=ob-ai-seo-blog' ) ); ?>"><?php esc_html_e( '← İçerik üret', 'ob-ai-seo-blog' ); ?></a>
+			</div>
+			<div class="ob-ai-panel">
+				<?php self::render_queue_table( $rows ); ?>
 			</div>
 		</div>
 		<?php

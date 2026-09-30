@@ -44,10 +44,17 @@ class OB_AI_Post_Creator {
 			}
 		}
 
-		$publish_gmt = $item->publish_at_gmt ? $item->publish_at_gmt : current_time( 'mysql', true );
-		$publish_loc = get_date_from_gmt( $publish_gmt );
-		$now_gmt     = current_time( 'mysql', true );
-		$status      = ( strtotime( $publish_gmt ) > strtotime( $now_gmt ) ) ? 'future' : 'publish';
+		$publish_gmt  = $item->publish_at_gmt ? $item->publish_at_gmt : current_time( 'mysql', true );
+		$publish_loc  = get_date_from_gmt( $publish_gmt );
+		$now_gmt      = current_time( 'mysql', true );
+		$want_status  = isset( $item->post_status ) ? (string) $item->post_status : 'publish';
+		if ( 'draft' === $want_status ) {
+			$status = 'draft';
+		} elseif ( 'future' === $want_status || strtotime( $publish_gmt ) > strtotime( $now_gmt ) ) {
+			$status = 'future';
+		} else {
+			$status = 'publish';
+		}
 
 		$postarr = array(
 			'post_title'   => sanitize_text_field( $article['title'] ),

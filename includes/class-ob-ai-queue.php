@@ -10,6 +10,15 @@ class OB_AI_Queue {
 
 	public static function init(): void {
 		add_action( 'ob_ai_seo_blog_process_queue', array( __CLASS__, 'process_pending' ) );
+		add_action(
+			'admin_init',
+			static function () {
+				if ( get_option( 'ob_ai_seo_blog_db_version' ) !== OB_AI_SEO_BLOG_VERSION ) {
+					self::create_table();
+					update_option( 'ob_ai_seo_blog_db_version', OB_AI_SEO_BLOG_VERSION );
+				}
+			}
+		);
 	}
 
 	public static function table_name(): string {
@@ -31,6 +40,7 @@ class OB_AI_Queue {
 			publish_at_gmt datetime NULL,
 			status varchar(20) NOT NULL DEFAULT 'pending',
 			post_id bigint(20) unsigned NULL,
+			post_status varchar(20) NOT NULL DEFAULT 'publish',
 			error_message text NULL,
 			created_at_gmt datetime NOT NULL,
 			updated_at_gmt datetime NOT NULL,
@@ -40,12 +50,65 @@ class OB_AI_Queue {
 		) {$charset};";
 
 		dbDelta( $sql );
+
+		$cols = $wpdb->get_col( "DESC {$table}", 0 ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( $cols && ! in_array( 'post_status', $cols, true ) ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query( "ALTER TABLE {$table} ADD COLUMN post_status varchar(20) NOT NULL DEFAULT 'publish' AFTER post_id" );
+		}
 	}
 
 	/**
 	 * @param array<int, array{keyword:string, publish_local:?string}> $items
 	 */
-	public static function enqueue_batch( array $items, ?string $schedule_start_local, int $interval_minutes ): string {
+	/**
+	 * @return array{produced:int, queued:int, planned:int, failed:int}
+	 */
+	public static function dashboard_stats(): array {
+		global $wpdb;
+		$table = self::table_name();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$produced = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status = 'done'" );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$queued = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status IN ('pending','processing')" );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$failed = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status = 'failed'" );
+		$planned  = 0;
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$done_rows = $wpdb->get_results( "SELECT post_id FROM {$table} WHERE status = 'done' AND post_id IS NOT NULL" );
+		foreach ( $done_rows as $dr ) {
+			if ( $dr->post_id && 'future' === get_post_status( (int) $dr->post_id ) ) {
+				++$planned;
+			}
+		}
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$planned += (int) $wpdb->get_var(
+			"SELECT COUNT(*) FROM {$table} WHERE status IN ('pending','processing') AND publish_at_gmt > UTC_TIMESTAMP()"
+		);
+		return array(
+			'produced' => $produced,
+			'queued'   => $queued,
+			'planned'  => $planned,
+			'failed'   => $failed,
+		);
+	}
+
+	/**
+	 * @return array<int, object>
+	 */
+	public static function recent_queue_rows( int $limit = 25 ): array {
+		global $wpdb;
+		$table = self::table_name();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d", $limit ) );
+	}
+
+	public static function enqueue_batch(
+		array $items,
+		?string $schedule_start_local,
+		int $interval_minutes,
+		string $default_post_status = 'publish'
+	): string {
 		global $wpdb;
 
 		$batch_id = wp_generate_password( 12, false, false );
@@ -72,17 +135,27 @@ class OB_AI_Queue {
 			}
 			++$index;
 
+			if ( 'draft' === $default_post_status ) {
+				$row_status  = 'draft';
+				$publish_gmt = $now_gmt;
+			} elseif ( strtotime( $publish_gmt ) > strtotime( $now_gmt ) ) {
+				$row_status = 'future';
+			} else {
+				$row_status = 'publish';
+			}
+
 			$wpdb->insert(
 				self::table_name(),
 				array(
 					'batch_id'        => $batch_id,
 					'focus_keyword'   => $keyword,
 					'publish_at_gmt'  => $publish_gmt,
+					'post_status'     => $row_status,
 					'status'          => 'pending',
 					'created_at_gmt'  => $now_gmt,
 					'updated_at_gmt'  => $now_gmt,
 				),
-				array( '%s', '%s', '%s', '%s', '%s', '%s' )
+				array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 			);
 		}
 
